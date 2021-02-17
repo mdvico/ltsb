@@ -1,0 +1,35 @@
+- description: ID vs. VDS.
+  simulation: ".DC VVDD 0 5 0.005"
+  values:
+    - VVGS: [0, 1, 2, 3, 4, 5]
+  instructions: .include /home/mvico/tfg/recursos/OpAmp/tecnologia/C5_models.txt
+# - description: Punto de operación.
+#   simulation: .OP
+#   values:
+#     - VVGS: [0, 2.5, 5]
+#   instructions: .include /home/mvico/tfg/recursos/OpAmp/tecnologia/C5_models.txt
+# - description: ID vs. VGS.
+#   simulation: .dc VVGS 0 5 0.005
+#   values:
+#     - VVGS: [0, 1, 2, 3, 4, 5]
+#   instructions: .include /home/mvico/tfg/recursos/OpAmp/tecnologia/C5_models.txt
+# - description: gm=(d(ID)) vs. ID.
+#   simulation: .
+#   parameters: .param id Id(Mn_l_0p6)
+#   instructions: .include /home/mvico/tfg/recursos/OpAmp/tecnologia/C5_models.txt
+# - description: gm=(d(ID))/ID vs. ID.
+#   simulation: .
+#   values:
+#   parameters: .param id Id(Mn_l_0p6)
+#   instructions: .include /home/mvico/tfg/recursos/OpAmp/tecnologia/C5_models.txt
+# - description: gm=(d(ID)) vs VGS.
+#   simulation: .
+#   values:
+#   parameters: .param id Id(Mn_l_0p6)
+#   instructions: .include /home/mvico/tfg/recursos/OpAmp/tecnologia/C5_models.txt
+# - description: gm=(d(ID))/ID vs VGS.
+#   simulation: .
+#   values:
+#   parameters: .param id Id(Mn_l_0p6)
+#   instructions: .include /home/mvico/tfg/recursos/OpAmp/tecnologia/C5_models.txt
+#   reset: True
