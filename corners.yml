@@ -3,13 +3,13 @@
   VDD: 4.5
   VSS: 0
   reference_current: 95
-# - name: TT
-#   temperature: 65
-#   VDD: 5
-#   VSS: 0
-#   reference_current: 100
-# - name: FF
-#   temperature: 0
-#   VDD: 5.5
-#   VSS: 0
-#   reference_current: 105
+- name: TT
+  temperature: 65
+  VDD: 5
+  VSS: 0
+  reference_current: 100
+- name: FF
+  temperature: 0
+  VDD: 5.5
+  VSS: 0
+  reference_current: 105
