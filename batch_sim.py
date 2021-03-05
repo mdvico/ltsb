@@ -1,6 +1,7 @@
-#!/home/mvico/Documents/projects/python/ltsb/venv/bin/python
+#!/home/mvico/projects/ltsb/venv/bin/python
 
 import argparse
+import os
 import pdb
 import sys
 from pathlib import Path
@@ -20,7 +21,7 @@ args = parser.parse_args()
 try:
     with open(args.netlist) as data:
         netlists = yaml.load(data, Loader = yaml.FullLoader)
-        if (args.debug):
+        if args.debug:
             print("Netlists:")
             pp(netlists)
             print()
@@ -32,7 +33,7 @@ except:
 try:
     with open(args.corners) as data:
         corners = yaml.load(data, Loader = yaml.FullLoader)
-        if (args.debug):
+        if args.debug:
             print("Corners:")
             pp(corners)
             print()
@@ -43,72 +44,109 @@ except:
 try:
     with open(args.simulations) as data:
         simulations = yaml.load(data, Loader = yaml.FullLoader)
-        if (args.debug):
+        if args.debug:
             print("Simulations:")
+            pp(simulations)
             print()
 except:
     simulations = []
     print("No simulation file was supplied, assuming simulations present on the netlist.")
 
 sims_run = []
-cmdline_extra_switches = ['-ascii']
+cmdline_extra_switches = ["-ascii"]
+verbose = False
+
+def post_proc(raw, log):
+    # print(a)
+    # print(b)
+    global verbose
+    print("Finished simulation. Raw file: {} - Log file: {}".format(raw, log) if verbose else '')
 
 LTCs = []
 for netlist in netlists:
-    LTCs.append(SimCommander(netlist["netlist"], parallel_sims = 8))
+    LTCs.append(SimCommander(netlist["netlist"], parallel_sims = 12))
 
 for LTC in LTCs:
     LTC.add_LTspiceRunCmdLineSwitches(cmdline_extra_switches)
+
+    if args.debug:
+        print("Original netlist:")
+        pp(LTC.netlist)
+
     for corner in corners:
-        LTC.add_instructions(f".temp {corner['temperature']}")
+        if corner.get("temperature") is not None:
+            LTC.add_instructions(f".TEMP {corner['temperature']}")
         for simulation in simulations:
             if simulation.get("instructions") is not None:
                 LTC.add_instructions(f"{simulation['instructions']}")
 
-            print("Before")
-            pp(LTC.netlist)
-            print(f"{simulation['simulation']}")
+            if simulation.get("simulation") is None:
+                print("No simulation type is present. Please check your simulation YAML file.")
+                exit()
             LTC.add_instructions(f"{simulation['simulation']}")
-            print("After")
-            pp(LTC.netlist)
+
             # LTspice no toma a 'TEMP' como un parámetro para reemplazar a '.temp'
             # LTC.set_parameters(TEMP = corner["temperature"])
-            LTC.set_component_value("VVDD", corner['VDD'])
-            # LTC.set_component_value("VVSS", corner['VSS'])
-            for value in simulation["values"]:
-                for element, values in value.items():
-                    for value in values:
-                        LTC.set_component_value(element, value)
-                        sims_run.append(f"Running file: {netlist} - {simulation['simulation']} - VDD = {corner['VDD']} - TEMP = {corner['temperature']} - Swap/Sweep = {element} = {value}")
-                        LTC.run()
+
+            if corner.get("VDD") is not None:
+                try:
+                    LTC.set_component_value("VVDD", corner['VDD'])
+                except Exception as e:
+                    print(f"WARNING: {e}")
+
+            if corner.get("VSS") is not None:
+                try:
+                    LTC.set_component_value("VVSS", corner['VSS'])
+                except Exception as e:
+                    print(f"WARNING: {e}")
+
+            if simulation.get("values") is not None:
+                for value in simulation["values"]:
+                    for element, values in value.items():
+                        for value in values:
+                            LTC.set_component_value(element, value)
+                            sims_run.append(f"Running file: {netlist} - {simulation['simulation']} - VDD = {corner['VDD']} - TEMP = {corner['temperature']} - Swap/Sweep = {element} = {value}")
+
+                            if args.debug:
+                                print("Modified netlist about to run:")
+                                pp(LTC.netlist)
+                                input("Ready?")
+
+                            circuit_path, _ = os.path.split(LTC.netlist_file)
+                            netlist_safe_name = simulation.get("description").replace(" ", "-").replace(".", "")
+                            temp = corner.get("temperature")
+                            volt = corner.get("VDD")
+
+                            netlist_final_path = circuit_path + os.path.sep + netlist_safe_name + f"_{temp}_" + f"{volt}_" + f"{element}_" + f"{value}"
+                            netlist_final_path = f"{netlist_final_path.replace('.', 'p')}.net"
+
+                            LTC.run(run_filename = netlist_final_path, callback = post_proc)
 
             try:
-                print(LTC.netlist)
-                LTC.remove_instructions(f"{simulation['simulation']}\n")
-                print(f"Successfuly removed {simulation['simulation']}")
+                LTC.remove_instructions(f"{simulation['simulation']}")
+                # print(f"Successfuly removed {simulation['simulation']}")
             except:
-                print(f"Tried to remove {simulation['simulation']} and failed on netlist {netlist}")
-            # if simulation.get("instructions") is not None:
+                print(f"WARNING: Tried to remove {simulation['simulation']} and failed on netlist {netlist}")
+            if simulation.get("instructions") is not None:
                 try:
-                    LTC.remove_instructions(f"{simulation['instructions']}\n")
-                    print(f"Successfuly removed {simulation['instructions']}")
+                    LTC.remove_instructions(f"{simulation['instructions']}")
+                    # print(f"Successfuly removed {simulation['instructions']}")
                 except:
-                    print(f"Tried to remove {simulation['instructions']} and failed!")
+                    print(f"WARNING: Tried to remove {simulation['instructions']} and failed!")
         try:
-            LTC.remove_instructions(f".temp {corner['temperature']}\n")
-            print(f"Successfuly removed .temp {corner['temperature']}")
+            LTC.remove_instructions(f".TEMP {corner['temperature']}")
+            # print(f"Successfuly removed .TEMP {corner['temperature']}")
         except:
-            print(f"Tried to remove .temp {corner['temperature']} and failed!")
+            print(f"WARNING: Tried to remove .TEMP {corner['temperature']} and failed!")
     LTC.wait_completion()  # Waits for the LTSpice simulations to complete
-    LTC.reset_netlist()
+    # LTC.reset_netlist()
 
-# LTC.wait_completion()  # Waits for the LTSpice simulations to complete
-pp(sims_run)
+    if args.debug:
+        pp(sims_run)
 
-
-print(f"Total Simulations: {LTC.runno}")
-print(f"Successful Simulations: {LTC.okSim}")
-print(f"Failed Simulations: {LTC.failSim}")
+    print(f"Total Simulations: {LTC.runno}")
+    print(f"Successful Simulations: {LTC.okSim}")
+    print(f"Failed Simulations: {LTC.failSim}")
 
 def sim_scheduler(LTC, simulation, temperature, instructions, VDD, values, **kwargs):
     LTC.add_instructions(f"{simulation}", f".temp {temperature}")
